@@ -217,7 +217,7 @@ const instructions = {
   stimulus: `
     <h2>Instructions</h2>
     <p>You will see 36 male and female images in a random order.</p>
-    <p>For each image, you will answer <b>5 questions</b> (one per page).</p>
+    <p>For each image, you will answer <b>5 questions</b> (one per page) using a likert scale.</p>
     <p style="margin-top: 40px;">Press SPACE to view an example before starting.</p>
   `,
   choices: [" "]
@@ -241,7 +241,7 @@ const exampleTrial = {
         In the real experiment, you will answer questions like this using a Likert scale from 1 (Not friendly at all) to 7 (Very friendly).
       </div>
 
-      <div class="ex-bottom">Press SPACE to continue.</div>
+      <div class="ex-bottom">Press SPACE to begin the experiment.</div>
     </div>
   `,
   choices: [" "]
