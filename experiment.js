@@ -6,6 +6,8 @@
  * - 36 images randomized
  * - 5 questions per image (one page per question)
  * - Logs each question page to Firebase Realtime Database
+ * - Continue button disabled until participant interacts with slider
+ *   (even if they keep the default value of 4)
  ****************************************************/
 
 /* ---------- Global style injection (font + progress bar) ---------- */
@@ -269,6 +271,36 @@ function makeImageQuestionTrials(facePath) {
     html,
     button_label: "Continue",
     data: { modality: "image", stimulus: facePath, question: questionKey },
+
+    // NEW: require interaction before enabling Continue
+    on_load: () => {
+      const display = jsPsych.getDisplayElement();
+      const btn = display.querySelector(".jspsych-btn");
+      const slider = display.querySelector('input[type="range"][name="response"]');
+
+      if (btn) btn.disabled = true;
+
+      if (slider) {
+        const enable = () => {
+          if (btn) btn.disabled = false;
+
+          slider.removeEventListener("input", enable);
+          slider.removeEventListener("change", enable);
+          slider.removeEventListener("pointerdown", enable);
+          slider.removeEventListener("mousedown", enable);
+          slider.removeEventListener("click", enable);
+          slider.removeEventListener("touchstart", enable);
+        };
+
+        slider.addEventListener("input", enable);
+        slider.addEventListener("change", enable);
+        slider.addEventListener("pointerdown", enable);
+        slider.addEventListener("mousedown", enable);
+        slider.addEventListener("click", enable);
+        slider.addEventListener("touchstart", enable, { passive: true });
+      }
+    },
+
     on_finish: (data) => logToFirebase(data)
   });
 
