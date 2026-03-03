@@ -135,7 +135,6 @@ const consent = {
 
       <div id="consentBox" class="consent-box">
         <p><b>Researchers:</b><br>
-          Eshnaa Aujla, graduate student (eshnaa15@yorku.ca)<br>
           Shreya Sharma, graduate student (ssharm29@york.ca)<br>
           Supervisor: Vinod Goel, vgoel@yorku.ca
         </p>
@@ -217,7 +216,7 @@ const instructions = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <h2>Instructions</h2>
-    <p>You will see images in a random order.</p>
+    <p>You will see 36 male and female images in a random order.</p>
     <p>For each image, you will answer <b>5 questions</b> (one per page).</p>
     <p style="margin-top: 40px;">Press SPACE to view an example before starting.</p>
   `,
