@@ -175,7 +175,7 @@ const consent = {
 
         <p>Your data may be deposited in a publicly accessible scientific repository in fully anonymized form. No identifying information will be included.</p>
 
-        <p><b>Questions?</b> For questions about the study, contact Dr. Vinod Goel, Eshnaa Aujla, or Shreya Sharma. For questions about your rights, contact York University's Office of Research Ethics at ore@yorku.ca.</p>
+        <p><b>Questions?</b> For questions about the study, contact Dr. Vinod Goel or Shreya Sharma. For questions about your rights, contact York University's Office of Research Ethics at ore@yorku.ca.</p>
 
         <p><b>Legal Rights and Signatures:</b><br>
         By selecting “I consent to participate,” you indicate that you have read and understood the information above and agree to participate voluntarily.</p>
