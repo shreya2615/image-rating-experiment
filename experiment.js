@@ -1,13 +1,15 @@
 /****************************************************
  * jsPsych v7 + Firebase RTDB (compat)
- * - Consent page (scroll-to-enable buttons) matching your screenshot
+ * - Consent page (scroll-to-enable buttons)
  * - Instructions page
- * - Example page matching your screenshot
- * - 36 images randomized
+ * - Example page
+ * - TWO BLOCKS:
+ *    Block A = images 1–18
+ *    Block B = images 19–36
+ * - Randomizes order WITHIN each block
  * - 5 questions per image (one page per question)
- * - Logs each question page to Firebase Realtime Database
+ * - Logs each question page to Firebase Realtime Database (includes block)
  * - Continue button disabled until participant interacts with slider
- *   (even if they keep the default value of 4)
  ****************************************************/
 
 /* ---------- Global style injection (font + progress bar) ---------- */
@@ -19,7 +21,7 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-/* ---------- Consent + Example styling (to match screenshots) ---------- */
+/* ---------- Consent + Example styling + Block label styling ---------- */
 var consentStyle = document.createElement("style");
 consentStyle.innerHTML = `
   .consent-wrap { max-width: 980px; margin: 0 auto; text-align: center; }
@@ -51,6 +53,18 @@ consentStyle.innerHTML = `
   .ex-q b { font-weight: 800; }
   .ex-ital { font-size: 22px; font-style: italic; margin: 18px 0; }
   .ex-bottom { font-size: 24px; font-weight: 800; margin-top: 26px; }
+
+  /* Block label */
+  .block-label {
+    position: fixed;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 20px;
+    color: #999;
+    z-index: 9999;
+    pointer-events: none;
+  }
 `;
 document.head.appendChild(consentStyle);
 
@@ -90,6 +104,7 @@ const logToFirebase = (trialData) => {
   const entry = {
     participantID: pid,
     modality: trialData.modality || "image",
+    block: trialData.block || "",
     stimulus: trialData.stimulus || "",
     question: trialData.question || "",
     response: trialData.response?.response ?? "",
@@ -101,10 +116,10 @@ const logToFirebase = (trialData) => {
 };
 
 /* ---------- EDIT THESE: image filenames ---------- */
-/* This assumes you have: all_images/img01.png ... all_images/img36.png */
+/* Assumes: all_images/img01.png ... all_images/img36.png */
 const imageFiles = Array.from({ length: 36 }, (_, i) => {
   const n = String(i + 1).padStart(2, "0");
-  return `all_images/img${n}.png`; // change to .jpg if needed
+  return `all_images/img${n}.png`; // change extension if needed
 });
 
 /* Example image shown on example page */
@@ -135,6 +150,7 @@ const consent = {
 
       <div id="consentBox" class="consent-box">
         <p><b>Researchers:</b><br>
+          Eshnaa Aujla, graduate student (eshnaa15@yorku.ca)<br>
           Shreya Sharma, graduate student (ssharm29@york.ca)<br>
           Supervisor: Vinod Goel, vgoel@yorku.ca
         </p>
@@ -216,14 +232,15 @@ const instructions = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <h2>Instructions</h2>
-    <p>You will see 36 male and female images in a random order.</p>
-    <p>For each image, you will answer <b>5 questions</b> (one per page) using a likert scale.</p>
+    <p>There will be <b>2 blocks</b> in this study (Block A and Block B).</p>
+    <p>Images will be shown in a random order <b>within each block</b>.</p>
+    <p>For each image, you will answer <b>5 questions</b> (one per page).</p>
     <p style="margin-top: 40px;">Press SPACE to view an example before starting.</p>
   `,
   choices: [" "]
 };
 
-/* ---------- Example page (matches your screenshot) ---------- */
+/* ---------- Example page ---------- */
 const exampleTrial = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
@@ -241,14 +258,19 @@ const exampleTrial = {
         In the real experiment, you will answer questions like this using a Likert scale from 1 (Not friendly at all) to 7 (Very friendly).
       </div>
 
-      <div class="ex-bottom">Press SPACE to begin the experiment.</div>
+      <div class="ex-bottom">Press SPACE to continue.</div>
     </div>
   `,
   choices: [" "]
 };
 
+/* ---------- Helper: fixed block label HTML ---------- */
+function blockLabelHtml(blockLabel) {
+  return `<div class="block-label">Block ${blockLabel}</div>`;
+}
+
 /* ---------- One image => 5 question pages ---------- */
-function makeImageQuestionTrials(facePath) {
+function makeImageQuestionTrials(facePath, blockLabel) {
   const sliderScale = `
     <input type='range' name='response' min='1' max='7' step='1' value='4' style='width: 100%;'><br>
     <div style='display:flex; justify-content:space-between;'>
@@ -257,6 +279,7 @@ function makeImageQuestionTrials(facePath) {
   `;
 
   const common = (qText) => `
+    ${blockLabelHtml(blockLabel)}
     <p><em>The image may take a few seconds to load.</em></p>
     <div style="text-align:center;">
       <img src="${facePath}" height="300" />
@@ -269,9 +292,9 @@ function makeImageQuestionTrials(facePath) {
     preamble: common(questionText),
     html,
     button_label: "Continue",
-    data: { modality: "image", stimulus: facePath, question: questionKey },
+    data: { modality: "image", stimulus: facePath, question: questionKey, block: blockLabel },
 
-    // NEW: require interaction before enabling Continue
+    // Require interaction before enabling Continue (even if staying at 4)
     on_load: () => {
       const display = jsPsych.getDisplayElement();
       const btn = display.querySelector(".jspsych-btn");
@@ -304,26 +327,10 @@ function makeImageQuestionTrials(facePath) {
   });
 
   return [
-    makeTrial(
-      "dominant",
-      "How dominant does this individual look? (1 = Not dominant at all, 7 = Very dominant)",
-      sliderScale
-    ),
-    makeTrial(
-      "trustworthy",
-      "How trustworthy does this individual look? (1 = Not trustworthy at all, 7 = Very trustworthy)",
-      sliderScale
-    ),
-    makeTrial(
-      "honest",
-      "How honest does this individual look? (1 = Not honest at all, 7 = Very honest)",
-      sliderScale
-    ),
-    makeTrial(
-      "attractive",
-      "How attractive does this individual look? (1 = Not attractive at all, 7 = Very attractive)",
-      sliderScale
-    ),
+    makeTrial("dominant", "How dominant does this individual look? (1 = Not dominant at all, 7 = Very dominant)", sliderScale),
+    makeTrial("trustworthy", "How trustworthy does this individual look? (1 = Not trustworthy at all, 7 = Very trustworthy)", sliderScale),
+    makeTrial("honest", "How honest does this individual look? (1 = Not honest at all, 7 = Very honest)", sliderScale),
+    makeTrial("attractive", "How attractive does this individual look? (1 = Not attractive at all, 7 = Very attractive)", sliderScale),
     makeTrial(
       "tall",
       "How tall do you think this person is?",
@@ -335,12 +342,50 @@ function makeImageQuestionTrials(facePath) {
   ];
 }
 
-/* ---------- Build trials ---------- */
-const randomizedImages = jsPsych.randomization.shuffle(imageFiles);
-let imageTrials = [];
-randomizedImages.forEach((img) => {
-  imageTrials = imageTrials.concat(makeImageQuestionTrials(img));
+/* ---------- Build Block A and Block B ---------- */
+const blockAImages = imageFiles.slice(0, 18);   // img01..img18
+const blockBImages = imageFiles.slice(18, 36);  // img19..img36
+
+const shuffledA = jsPsych.randomization.shuffle(blockAImages);
+const shuffledB = jsPsych.randomization.shuffle(blockBImages);
+
+let blockATrials = [];
+shuffledA.forEach((img) => {
+  blockATrials = blockATrials.concat(makeImageQuestionTrials(img, "A"));
 });
+
+let blockBTrials = [];
+shuffledB.forEach((img) => {
+  blockBTrials = blockBTrials.concat(makeImageQuestionTrials(img, "B"));
+});
+
+/* ---------- End-of-block screen ---------- */
+const endOfBlockA = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    ${blockLabelHtml("A")}
+    <div style="font-size: 24px; text-align: center; margin-top: 100px;">
+      <p>End of Block A</p>
+      <p>Take a short break if you need to.</p>
+      <p><b>Press SPACE to continue to Block B.</b></p>
+    </div>
+  `,
+  choices: [" "],
+  data: { modality: "break", question: "end_of_block", block: "A" },
+  on_finish: (data) => {
+    // Log the break screen as well
+    database.ref(`participants/${participantID}/trials`).push({
+      participantID,
+      modality: "break",
+      block: "A",
+      stimulus: "",
+      question: "end_of_block",
+      response: "",
+      rt: data.rt ?? "",
+      timestamp: Date.now()
+    });
+  }
+};
 
 /* ---------- End screen ---------- */
 const endScreen = {
@@ -368,7 +413,14 @@ timeline.push({
 });
 
 timeline.push({
-  timeline: [instructions, exampleTrial, ...imageTrials, endScreen],
+  timeline: [
+    instructions,
+    exampleTrial,
+    ...blockATrials,
+    endOfBlockA,
+    ...blockBTrials,
+    endScreen
+  ],
   conditional_function: () => {
     const c = jsPsych.data.get().filter({ trial_type: "consent" }).last(1).values()[0];
     return c && c.consented === true;
