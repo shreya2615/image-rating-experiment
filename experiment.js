@@ -2,16 +2,15 @@
  * jsPsych v7 + Firebase RTDB (compat)
  * - Consent (scroll-to-enable)
  * - Instructions
- * - Example page WITH a Likert slider (must interact to continue)
- * - TWO image sets:
- *    Set 1 = images 1–18
- *    Set 2 = images 19–36
+ * - Example page WITH Likert slider (must interact to continue)
+ * - TWO image sets: Set 1 (1–18), Set 2 (19–36)
  * - Random assignment:
  *    Block A shows either Set 1 or Set 2 (random)
  *    Block B shows the remaining set
  * - Randomizes order WITHIN each block
- * - 5 questions per image (one page per question)
- * - Logs to Firebase (includes block + block_set)
+ * - For EACH image: 5 questions shown in RANDOM ORDER
+ * - Adds "Image X of 18" label within each block (shown on all 5 pages for that image)
+ * - Logs to Firebase (includes block + block_set + image_in_block)
  * - Continue disabled until participant interacts with slider (even if they keep 4)
  ****************************************************/
 
@@ -24,7 +23,7 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-/* ---------- Consent + Example styling + Block label styling ---------- */
+/* ---------- Consent + Example styling + Block label + Image counter ---------- */
 var consentStyle = document.createElement("style");
 consentStyle.innerHTML = `
   .consent-wrap { max-width: 980px; margin: 0 auto; text-align: center; }
@@ -56,7 +55,7 @@ consentStyle.innerHTML = `
   .ex-q b { font-weight: 800; }
   .ex-ital { font-size: 22px; font-style: italic; margin: 14px 0; }
   .ex-helper { font-size: 18px; font-style: italic; color: #555; margin-top: 10px; }
-  
+
   .block-label {
     position: fixed;
     top: 6px;
@@ -66,6 +65,14 @@ consentStyle.innerHTML = `
     color: #999;
     z-index: 9999;
     pointer-events: none;
+  }
+
+  .img-counter {
+    text-align: center;
+    font-size: 20px;
+    color: #666;
+    margin: 14px 0 10px;
+    font-weight: 600;
   }
 `;
 document.head.appendChild(consentStyle);
@@ -108,6 +115,7 @@ const logToFirebase = (trialData) => {
     modality: trialData.modality || "image",
     block: trialData.block || "",
     block_set: trialData.block_set || "",
+    image_in_block: trialData.image_in_block ?? "",
     stimulus: trialData.stimulus || "",
     question: trialData.question || "",
     response: trialData.response?.response ?? "",
@@ -119,7 +127,6 @@ const logToFirebase = (trialData) => {
 };
 
 /* ---------- Images ---------- */
-/* Assumes: all_images/img01.png ... all_images/img36.png */
 const imageFiles = Array.from({ length: 36 }, (_, i) => {
   const n = String(i + 1).padStart(2, "0");
   return `all_images/img${n}.png`;
@@ -266,9 +273,7 @@ const exampleTrial = {
   `,
   button_label: "Continue",
   data: { modality: "example", question: "example_likert" },
-
   on_load: () => {
-    // Same rule: must interact even if leaving at 4
     const display = jsPsych.getDisplayElement();
     const btn = display.querySelector(".jspsych-btn");
     const slider = display.querySelector('input[type="range"][name="response"]');
@@ -299,8 +304,8 @@ function blockLabelHtml(blockLabel) {
   return `<div class="block-label">Block ${blockLabel}</div>`;
 }
 
-/* ---------- One image => 5 question pages ---------- */
-function makeImageQuestionTrials(facePath, blockLabel, blockSetLabel) {
+/* ---------- Build 5 question trials, then SHUFFLE THEM per image ---------- */
+function makeImageQuestionTrials(facePath, blockLabel, blockSetLabel, imageInBlock, totalImagesInBlock) {
   const sliderScale = `
     <input type='range' name='response' min='1' max='7' step='1' value='4' style='width: 100%;'><br>
     <div style='display:flex; justify-content:space-between;'>
@@ -310,6 +315,7 @@ function makeImageQuestionTrials(facePath, blockLabel, blockSetLabel) {
 
   const common = (qText) => `
     ${blockLabelHtml(blockLabel)}
+    <div class="img-counter">Image ${imageInBlock} of ${totalImagesInBlock}</div>
     <p><em>The image may take a few seconds to load.</em></p>
     <div style="text-align:center;"><img src="${facePath}" height="300" /></div>
     <p><b>${qText}</b><br><i>Please use your mouse and the slider below to make your selection.</i></p>
@@ -325,9 +331,9 @@ function makeImageQuestionTrials(facePath, blockLabel, blockSetLabel) {
       stimulus: facePath,
       question: questionKey,
       block: blockLabel,
-      block_set: blockSetLabel
+      block_set: blockSetLabel,
+      image_in_block: imageInBlock
     },
-
     on_load: () => {
       const display = jsPsych.getDisplayElement();
       const btn = display.querySelector(".jspsych-btn");
@@ -352,11 +358,10 @@ function makeImageQuestionTrials(facePath, blockLabel, blockSetLabel) {
         slider.addEventListener("touchstart", enable, { passive: true });
       }
     },
-
     on_finish: (data) => logToFirebase(data)
   });
 
-  return [
+  const qTrials = [
     makeTrial("dominant", "How dominant does this individual look? (1 = Not dominant at all, 7 = Very dominant)", sliderScale),
     makeTrial("trustworthy", "How trustworthy does this individual look? (1 = Not trustworthy at all, 7 = Very trustworthy)", sliderScale),
     makeTrial("honest", "How honest does this individual look? (1 = Not honest at all, 7 = Very honest)", sliderScale),
@@ -365,11 +370,13 @@ function makeImageQuestionTrials(facePath, blockLabel, blockSetLabel) {
       <input type='range' name='response' min='6' max='18' step='1' value='12' style='width: 100%;'><br>${heightLabels}
     `)
   ];
+
+  return jsPsych.randomization.shuffle(qTrials);
 }
 
 /* ---------- Define two sets ---------- */
-const set1 = imageFiles.slice(0, 18);   // img01..img18
-const set2 = imageFiles.slice(18, 36);  // img19..img36
+const set1 = imageFiles.slice(0, 18);
+const set2 = imageFiles.slice(18, 36);
 
 /* ---------- Randomly assign which set is Block A ---------- */
 const blockAUsesSet1 = Math.random() < 0.5;
@@ -392,14 +399,22 @@ database.ref(`participants/${participantID}/meta/block_assignment`).set({
 const shuffledA = jsPsych.randomization.shuffle(blockAImages);
 const shuffledB = jsPsych.randomization.shuffle(blockBImages);
 
+const TOTAL_PER_BLOCK = 18;
+
 let blockATrials = [];
-shuffledA.forEach((img) => {
-  blockATrials = blockATrials.concat(makeImageQuestionTrials(img, "A", blockASetLabel));
+shuffledA.forEach((img, idx) => {
+  const imageInBlock = idx + 1; // 1..18
+  blockATrials = blockATrials.concat(
+    makeImageQuestionTrials(img, "A", blockASetLabel, imageInBlock, TOTAL_PER_BLOCK)
+  );
 });
 
 let blockBTrials = [];
-shuffledB.forEach((img) => {
-  blockBTrials = blockBTrials.concat(makeImageQuestionTrials(img, "B", blockBSetLabel));
+shuffledB.forEach((img, idx) => {
+  const imageInBlock = idx + 1; // 1..18
+  blockBTrials = blockBTrials.concat(
+    makeImageQuestionTrials(img, "B", blockBSetLabel, imageInBlock, TOTAL_PER_BLOCK)
+  );
 });
 
 /* ---------- End-of-block screen (after Block A) ---------- */
@@ -421,6 +436,7 @@ const endOfBlockA = {
       modality: "break",
       block: "A",
       block_set: blockASetLabel,
+      image_in_block: "",
       stimulus: "",
       question: "end_of_block",
       response: "",
