@@ -171,7 +171,6 @@ const consent = {
 
       <div id="consentBox" class="consent-box">
         <p><b>Researchers:</b><br>
-          Eshnaa Aujla, graduate student (eshnaa15@yorku.ca)<br>
           Shreya Sharma, graduate student (ssharm29@york.ca)<br>
           Supervisor: Vinod Goel, vgoel@yorku.ca
         </p>
@@ -196,7 +195,7 @@ const consent = {
 
         <p>Your data may be deposited in a publicly accessible scientific repository in fully anonymized form. No identifying information will be included.</p>
 
-        <p><b>Questions?</b> For questions about the study, contact Dr. Vinod Goel, Eshnaa Aujla, or Shreya Sharma. For questions about your rights, contact York University's Office of Research Ethics at ore@yorku.ca.</p>
+        <p><b>Questions?</b> For questions about the study, contact Dr. Vinod Goel or Shreya Sharma. For questions about your rights, contact York University's Office of Research Ethics at ore@yorku.ca.</p>
 
         <p><b>Legal Rights and Signatures:</b><br>
         By selecting “I consent to participate,” you indicate that you have read and understood the information above and agree to participate voluntarily.</p>
@@ -348,9 +347,10 @@ const instructions = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <h2>Instructions</h2>
-    <p>There will be <b>2 blocks</b> in this study (Block A and Block B).</p>
-    <p>Block A will contain one set of images, and Block B will contain the other set.</p>
-    <p>Images are shown in random order <b>within each block</b>.</p>
+    <p> The study contains <b>2 blocks</b>  (Block A and Block B).</p>
+    <p>Each block with contain a different set of images that will be randomly presented.</p>
+    <p>Each block contains <b>18 images</b> 9 male images and 9 female images, for a total of <b>36 images<b>.</p>
+    <p>For each image you will be required to answer 5 questions, please view the image and answer the associated question using the scale below it.</p>
     <p style="margin-top: 40px;">Press SPACE to view an example before starting.</p>
   `,
   choices: [" "]
@@ -380,7 +380,7 @@ const exampleTrial = {
     <div style='display:flex; justify-content:space-between;'>
       <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span>
     </div>
-    <div class="ex-helper">Click or move the slider to enable Continue.</div>
+    <div class="ex-helper">Click or move the slider to enable Continue and begin the experiment.</div>
   `,
   button_label: "Continue",
   data: { modality: "example", question: "example_likert" },
