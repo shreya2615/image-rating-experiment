@@ -1,17 +1,16 @@
 /****************************************************
  * jsPsych v7 + Firebase RTDB (compat)
  * - Consent (scroll-to-enable)
+ * - Demographics (one page, dropdowns)
  * - Instructions
- * - Example page WITH Likert slider (must interact to continue)
- * - TWO image sets: Set 1 (1–18), Set 2 (19–36)
- * - Random assignment:
- *    Block A shows either Set 1 or Set 2 (random)
- *    Block B shows the remaining set
- * - Randomizes order WITHIN each block
- * - For EACH image: 5 questions shown in RANDOM ORDER
- * - Adds "Image X of 18" label within each block (shown on all 5 pages for that image)
- * - Logs to Firebase (includes block + block_set + image_in_block)
- * - Continue disabled until participant interacts with slider (even if they keep 4)
+ * - Example WITH Likert slider (must interact to continue)
+ * - Two image sets (1–18, 19–36), random assignment to Block A/B
+ * - Random image order within blocks
+ * - Random question order within each image
+ * - Block label + Image X of 18 label
+ * - End-of-block screen
+ * - CloudResearch ID entry near end (required)
+ * - Logs to Firebase RTDB
  ****************************************************/
 
 /* ---------- Global style injection (font + progress bar) ---------- */
@@ -23,7 +22,7 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-/* ---------- Consent + Example styling + Block label + Image counter ---------- */
+/* ---------- Consent + Example styling + Block label + Image counter + Forms ---------- */
 var consentStyle = document.createElement("style");
 consentStyle.innerHTML = `
   .consent-wrap { max-width: 980px; margin: 0 auto; text-align: center; }
@@ -74,6 +73,19 @@ consentStyle.innerHTML = `
     margin: 14px 0 10px;
     font-weight: 600;
   }
+
+  .form-wrap { max-width: 900px; margin: 0 auto; text-align: left; }
+  .form-title { text-align:center; font-size: 34px; font-weight: 800; margin: 18px 0 12px; }
+  .form-sub { text-align:center; font-size: 18px; color: #555; margin: 0 0 18px; }
+  .form-row { margin: 14px 0; }
+  .form-row label { display:block; font-weight: 700; margin-bottom: 6px; }
+  .form-row select, .form-row input[type="text"] {
+    width: 100%;
+    font-size: 18px;
+    padding: 10px 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
 `;
 document.head.appendChild(consentStyle);
 
@@ -98,7 +110,7 @@ const jsPsych = initJsPsych({
   auto_update_progress_bar: true
 });
 
-/* ---------- Participant ID ---------- */
+/* ---------- Participant ID (internal; you will also collect CloudResearch ID later) ---------- */
 const participantID =
   jsPsych.data.getURLVariable("participantId") ||
   jsPsych.data.getURLVariable("id") ||
@@ -106,7 +118,7 @@ const participantID =
 
 jsPsych.data.addProperties({ participantID });
 
-/* ---------- Logging helper ---------- */
+/* ---------- Logging helper for stimulus trials ---------- */
 const logToFirebase = (trialData) => {
   const pid = jsPsych.data.get().values()[0]?.participantID || "unknown";
 
@@ -127,6 +139,7 @@ const logToFirebase = (trialData) => {
 };
 
 /* ---------- Images ---------- */
+/* Assumes: all_images/img01.png ... all_images/img36.png */
 const imageFiles = Array.from({ length: 36 }, (_, i) => {
   const n = String(i + 1).padStart(2, "0");
   return `all_images/img${n}.png`;
@@ -147,7 +160,7 @@ const preload = {
   images: [exampleImage, ...imageFiles]
 };
 
-/* ---------- Consent ---------- */
+/* ---------- Consent (scroll-to-enable) ---------- */
 const consent = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
@@ -230,6 +243,104 @@ const noConsentEnd = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `<h2>You chose not to participate.</h2><p>You may now close this tab/window.</p>`,
   choices: "NO_KEYS"
+};
+
+/* ---------- Demographics (all on one page, dropdowns) ---------- */
+const demographics = {
+  type: jsPsychSurveyHtmlForm,
+  preamble: `
+    <div class="form-wrap">
+      <div class="form-title">Demographic Questionnaire</div>
+      <div class="form-sub">Please answer the following questions.</div>
+    </div>
+  `,
+  html: `
+    <div class="form-wrap">
+      <div class="form-row">
+        <label for="age">Age</label>
+        <select name="age" id="age" required>
+          <option value="" selected disabled>Select one</option>
+          <option value="Under 18">Under 18</option>
+          <option value="18-24">18–24</option>
+          <option value="25-34">25–34</option>
+          <option value="35-44">35–44</option>
+          <option value="45-54">45–54</option>
+          <option value="55-64">55–64</option>
+          <option value="65+">65+</option>
+          <option value="Prefer not to say">Prefer not to say</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label for="gender">Gender</label>
+        <select name="gender" id="gender" required>
+          <option value="" selected disabled>Select one</option>
+          <option value="Woman">Woman</option>
+          <option value="Man">Man</option>
+          <option value="Non-binary">Non-binary</option>
+          <option value="Another identity">Another identity</option>
+          <option value="Prefer not to say">Prefer not to say</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label for="education">Highest level of education completed</label>
+        <select name="education" id="education" required>
+          <option value="" selected disabled>Select one</option>
+          <option value="Less than high school">Less than high school</option>
+          <option value="High school diploma or equivalent">High school diploma or equivalent</option>
+          <option value="Some college/university">Some college/university</option>
+          <option value="College diploma">College diploma</option>
+          <option value="Bachelor's degree">Bachelor's degree</option>
+          <option value="Master's degree">Master's degree</option>
+          <option value="Doctoral degree">Doctoral degree</option>
+          <option value="Prefer not to say">Prefer not to say</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label for="language">Primary language</label>
+        <select name="language" id="language" required>
+          <option value="" selected disabled>Select one</option>
+          <option value="English">English</option>
+          <option value="French">French</option>
+          <option value="Spanish">Spanish</option>
+          <option value="Other">Other</option>
+          <option value="Prefer not to say">Prefer not to say</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label for="country">Country of residence</label>
+        <select name="country" id="country" required>
+          <option value="" selected disabled>Select one</option>
+          <option value="Canada">Canada</option>
+          <option value="United States">United States</option>
+          <option value="United Kingdom">United Kingdom</option>
+          <option value="Other">Other</option>
+          <option value="Prefer not to say">Prefer not to say</option>
+        </select>
+      </div>
+    </div>
+  `,
+  button_label: "Continue",
+  data: { modality: "demographics", question: "demographics" },
+  on_finish: (data) => {
+    const resp = data.response || {};
+    jsPsych.data.addProperties({
+      age: resp.age,
+      gender: resp.gender,
+      education: resp.education,
+      language: resp.language,
+      country: resp.country
+    });
+
+    database.ref(`participants/${participantID}/meta/demographics`).set({
+      participantID,
+      ...resp,
+      timestamp: Date.now()
+    });
+  }
 };
 
 /* ---------- Instructions ---------- */
@@ -387,13 +498,13 @@ const blockBImages = blockAUsesSet1 ? set2 : set1;
 const blockASetLabel = blockAUsesSet1 ? "set_1_18" : "set_19_36";
 const blockBSetLabel = blockAUsesSet1 ? "set_19_36" : "set_1_18";
 
-/* Log assignment once */
-database.ref(`participants/${participantID}/meta/block_assignment`).set({
+/* Store assignment (will be written after consent) */
+const blockAssignmentPayload = {
   participantID,
   blockA_set: blockASetLabel,
   blockB_set: blockBSetLabel,
   timestamp: Date.now()
-});
+};
 
 /* Randomize within each block */
 const shuffledA = jsPsych.randomization.shuffle(blockAImages);
@@ -403,7 +514,7 @@ const TOTAL_PER_BLOCK = 18;
 
 let blockATrials = [];
 shuffledA.forEach((img, idx) => {
-  const imageInBlock = idx + 1; // 1..18
+  const imageInBlock = idx + 1;
   blockATrials = blockATrials.concat(
     makeImageQuestionTrials(img, "A", blockASetLabel, imageInBlock, TOTAL_PER_BLOCK)
   );
@@ -411,7 +522,7 @@ shuffledA.forEach((img, idx) => {
 
 let blockBTrials = [];
 shuffledB.forEach((img, idx) => {
-  const imageInBlock = idx + 1; // 1..18
+  const imageInBlock = idx + 1;
   blockBTrials = blockBTrials.concat(
     makeImageQuestionTrials(img, "B", blockBSetLabel, imageInBlock, TOTAL_PER_BLOCK)
   );
@@ -446,6 +557,58 @@ const endOfBlockA = {
   }
 };
 
+/* ---------- CloudResearch ID entry page (required) ---------- */
+const cloudIdTrial = {
+  type: jsPsychSurveyHtmlForm,
+  preamble: `
+    <div class="form-wrap">
+      <div class="form-title">CloudResearch ID</div>
+      <div class="form-sub">Please enter your CloudResearch Participant ID.</div>
+    </div>
+  `,
+  html: `
+    <div class="form-wrap">
+      <div class="form-row">
+        <label for="cloud_id">CloudResearch Participant ID</label>
+        <input type="text" id="cloud_id" name="cloud_id" placeholder="Enter your ID" required />
+      </div>
+      <div class="form-sub" id="cloudHelp" style="text-align:left;">You must type your ID to enable Continue.</div>
+    </div>
+  `,
+  button_label: "Continue",
+  data: { modality: "meta", question: "cloudresearch_id" },
+  on_load: () => {
+    const display = jsPsych.getDisplayElement();
+    const btn = display.querySelector(".jspsych-btn");
+    const input = display.querySelector('input[name="cloud_id"]');
+    const help = display.querySelector("#cloudHelp");
+
+    if (btn) btn.disabled = true;
+
+    const check = () => {
+      const ok = input && input.value && input.value.trim().length > 0;
+      if (btn) btn.disabled = !ok;
+      if (help) help.style.display = ok ? "none" : "block";
+    };
+
+    if (input) {
+      input.addEventListener("input", check);
+      input.addEventListener("change", check);
+      check();
+    }
+  },
+  on_finish: (data) => {
+    const cloudId = (data.response?.cloud_id || "").trim();
+    jsPsych.data.addProperties({ cloudresearch_id: cloudId });
+
+    database.ref(`participants/${participantID}/meta/cloudresearch_id`).set({
+      participantID,
+      cloudresearch_id: cloudId,
+      timestamp: Date.now()
+    });
+  }
+};
+
 /* ---------- End screen ---------- */
 const endScreen = {
   type: jsPsychHtmlKeyboardResponse,
@@ -458,7 +621,7 @@ const endScreen = {
   trial_duration: 4000
 };
 
-/* ---------- Run timeline with consent branching ---------- */
+/* ---------- Consent branching timeline ---------- */
 const timeline = [];
 timeline.push(preload);
 timeline.push(consent);
@@ -472,7 +635,28 @@ timeline.push({
 });
 
 timeline.push({
-  timeline: [instructions, exampleTrial, ...blockATrials, endOfBlockA, ...blockBTrials, endScreen],
+  timeline: [
+    demographics,
+
+    // store block assignment AFTER consent + demographics begins
+    {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: "",
+      choices: "NO_KEYS",
+      trial_duration: 1,
+      on_start: () => {
+        database.ref(`participants/${participantID}/meta/block_assignment`).set(blockAssignmentPayload);
+      }
+    },
+
+    instructions,
+    exampleTrial,
+    ...blockATrials,
+    endOfBlockA,
+    ...blockBTrials,
+    cloudIdTrial,
+    endScreen
+  ],
   conditional_function: () => {
     const c = jsPsych.data.get().filter({ trial_type: "consent" }).last(1).values()[0];
     return c && c.consented === true;
