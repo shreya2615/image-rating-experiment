@@ -349,8 +349,9 @@ const instructions = {
     <h2>Instructions</h2>
     <p> The study contains <b>2 blocks</b>  (Block A and Block B).</p>
     <p>Each block with contain a different set of images that will be randomly presented.</p>
-    <p>Each block contains <b>18 images</b> 9 male images and 9 female images, for a total of <b>36 images<b>.</p>
-    <p>For each image you will be required to answer 5 questions, please view the image and answer the associated question using the scale below it.</p>
+    <p>Each block contains <b>18 images</b> 9 male images and 9 female images, for a total of <b>36 images</b>.</p>
+    <p>For each image you will be required to answer 5 questions.</p>
+    <p>Please view the image and answer the associated question using the scale below it.</p>
     <p style="margin-top: 40px;">Press SPACE to view an example before starting.</p>
   `,
   choices: [" "]
