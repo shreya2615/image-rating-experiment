@@ -4,6 +4,7 @@
  * - Demographics (one page, dropdowns)
  * - Instructions
  * - Example WITH Likert slider (must interact to continue)
+ * - "Press SPACE to begin Block A" screen
  * - Two image sets (1–18, 19–36), random assignment to Block A/B
  * - Random image order within blocks
  * - Random question order within each image
@@ -297,14 +298,19 @@ const demographics = {
         </select>
       </div>
 
+      <!-- UPDATED: Ethnicity instead of Language -->
       <div class="form-row">
-        <label for="language">Primary language</label>
-        <select name="language" id="language" required>
+        <label for="ethnicity">Ethnicity</label>
+        <select name="ethnicity" id="ethnicity" required>
           <option value="" selected disabled>Select one</option>
-          <option value="English">English</option>
-          <option value="French">French</option>
-          <option value="Spanish">Spanish</option>
-          <option value="Other">Other</option>
+          <option value="Asian">Asian</option>
+          <option value="Black">Black</option>
+          <option value="Hispanic/Latino">Hispanic/Latino</option>
+          <option value="Middle Eastern/North African">Middle Eastern/North African</option>
+          <option value="Indigenous">Indigenous</option>
+          <option value="White">White</option>
+          <option value="Mixed/Multiracial">Mixed/Multiracial</option>
+          <option value="Another ethnicity">Another ethnicity</option>
           <option value="Prefer not to say">Prefer not to say</option>
         </select>
       </div>
@@ -330,7 +336,7 @@ const demographics = {
       age: resp.age,
       gender: resp.gender,
       education: resp.education,
-      language: resp.language,
+      ethnicity: resp.ethnicity,
       country: resp.country
     });
 
@@ -381,7 +387,7 @@ const exampleTrial = {
     <div style='display:flex; justify-content:space-between;'>
       <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span>
     </div>
-    <div class="ex-helper">Click or move the slider to enable Continue and begin the experiment.</div>
+    <div class="ex-helper">Click or move the slider to enable Continue.</div>
   `,
   button_label: "Continue",
   data: { modality: "example", question: "example_likert" },
@@ -475,9 +481,9 @@ function makeImageQuestionTrials(facePath, blockLabel, blockSetLabel, imageInBlo
 
   const qTrials = [
     makeTrial("dominant", "How dominant does this individual look? (1 = Not dominant at all, 7 = Very dominant)", sliderScale),
-    makeTrial("trustworthy", "How trustworthy does this individual look? (1 = Not trustworthy at all, 7 = Very trustworthy)", sliderScale),
-    makeTrial("honest", "How honest does this individual look? (1 = Not honest at all, 7 = Very honest)", sliderScale),
-    makeTrial("attractive", "How attractive does this individual look? (1 = Not attractive at all, 7 = Very attractive)", sliderScale),
+    makeTrial("trustworthy", "How trustworthy do you think this person is? (1 = Not trustworthy at all, 7 = Very trustworthy)", sliderScale),
+    makeTrial("honest", "How honest do you think this person is? (1 = Not honest at all, 7 = Very honest)", sliderScale),
+    makeTrial("attractive", "How attractive do you think this person is? (1 = Not attractive at all, 7 = Very attractive)", sliderScale),
     makeTrial("tall", "How tall do you think this person is?", `
       <input type='range' name='response' min='6' max='18' step='1' value='12' style='width: 100%;'><br>${heightLabels}
     `)
@@ -499,7 +505,7 @@ const blockBImages = blockAUsesSet1 ? set2 : set1;
 const blockASetLabel = blockAUsesSet1 ? "set_1_18" : "set_19_36";
 const blockBSetLabel = blockAUsesSet1 ? "set_19_36" : "set_1_18";
 
-/* Store assignment (will be written after consent) */
+/* Store assignment (will be written after consent + demographics begins) */
 const blockAssignmentPayload = {
   participantID,
   blockA_set: blockASetLabel,
@@ -528,6 +534,34 @@ shuffledB.forEach((img, idx) => {
     makeImageQuestionTrials(img, "B", blockBSetLabel, imageInBlock, TOTAL_PER_BLOCK)
   );
 });
+
+/* ---------- NEW: Start Block A screen ---------- */
+const startBlockA = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    ${blockLabelHtml("A")}
+    <div style="font-size: 28px; text-align:center; margin-top: 120px;">
+      <p><b>Block A</b></p>
+      <p>Press <b>SPACE</b> to begin.</p>
+    </div>
+  `,
+  choices: [" "],
+  data: { modality: "break", question: "start_block", block: "A", block_set: blockASetLabel },
+  on_finish: (data) => {
+    database.ref(`participants/${participantID}/trials`).push({
+      participantID,
+      modality: "break",
+      block: "A",
+      block_set: blockASetLabel,
+      image_in_block: "",
+      stimulus: "",
+      question: "start_block",
+      response: "",
+      rt: data.rt ?? "",
+      timestamp: Date.now()
+    });
+  }
+};
 
 /* ---------- End-of-block screen (after Block A) ---------- */
 const endOfBlockA = {
@@ -652,6 +686,10 @@ timeline.push({
 
     instructions,
     exampleTrial,
+
+    // NEW: page between example and Block A
+    startBlockA,
+
     ...blockATrials,
     endOfBlockA,
     ...blockBTrials,
