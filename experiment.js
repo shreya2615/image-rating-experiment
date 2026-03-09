@@ -67,11 +67,11 @@ style.innerHTML = `
   }
 
   .stim-wrap { max-width: 1200px; width: 95vw; margin: 0 auto; text-align: center; }
-  .stim-img { height: 220px; display:block; margin: 0 auto 6px; }
+  .stim-img { height: 250px; display:block; margin: 0 auto 6px; }
   .small-note { font-style: italic; color: #555; margin: 2px 0 6px; font-size: 16px; }
 
   .qblock { max-width: 1200px; width: 95vw; margin: 0 auto; text-align: left; }
-  .q { margin: 4px 0; padding: 6px 8px; border: 1px solid #e5e5e5; border-radius: 6px; }
+  .q { margin: 2px 0; padding: 4px 6px; border: 1px solid #e5e5e5; border-radius: 4px; }
   .qtitle { font-weight: 800; margin-bottom: 2px; font-size: 18px; }
 
   .likert-slider { margin-top: 2px; width: 100%; }
