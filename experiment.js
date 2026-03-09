@@ -66,11 +66,11 @@ style.innerHTML = `
     font-weight: 600;
   }
 
-  .stim-wrap { max-width: 900px; margin: 0 auto; text-align: center; }
+  .stim-wrap { max-width: 1200px; width: 95vw; margin: 0 auto; text-align: center; }
   .stim-img { height: 220px; display:block; margin: 0 auto 6px; }
   .small-note { font-style: italic; color: #555; margin: 2px 0 6px; font-size: 16px; }
 
-  .qblock { max-width: 900px; margin: 0 auto; text-align: left; }
+  .qblock { max-width: 1200px; width: 95vw; margin: 0 auto; text-align: left; }
   .q { margin: 6px 0; padding: 8px 10px; border: 1px solid #e5e5e5; border-radius: 10px; }
   .qtitle { font-weight: 800; margin-bottom: 4px; font-size: 18px; }
 
