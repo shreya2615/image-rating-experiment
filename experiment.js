@@ -4,13 +4,14 @@
  * - 6 male faces, each has 3 versions (18 total images)
  * - Each participant sees 6 images total:
  *     one version per face (counterbalanced per face)
- * - 4 questions on the SAME page under the image
+ * - 4 Likert-style slider questions on the SAME page under the image
  *     (dominance, trustworthiness, attractiveness, tall)
- * - Cannot continue unless ALL 4 are answered
+ * - Cannot continue unless ALL 4 questions are actively answered
+ *     (participant must click/move each slider at least once, even if staying at 4)
  *
  * Keeps:
  * - Consent page same style (scroll-to-enable)
- * - Demographics page same dropdown style
+ * - Demographics page same dropdown style (ethnicity)
  * - CloudResearch ID page
  * - End page
  ****************************************************/
@@ -60,19 +61,19 @@ style.innerHTML = `
     text-align: center;
     font-size: 20px;
     color: #666;
-    margin: 10px 0 8px;
+    margin: 8px 0 6px;
     font-weight: 600;
   }
+
   .stim-wrap { max-width: 900px; margin: 0 auto; text-align: center; }
-  .stim-img { height: 300px; display:block; margin: 0 auto 10px; }
-  .small-note { font-style: italic; color: #555; margin: 6px 0 14px; }
+  .stim-img { height: 260px; display:block; margin: 0 auto 8px; }
+  .small-note { font-style: italic; color: #555; margin: 4px 0 10px; }
 
   .qblock { max-width: 900px; margin: 0 auto; text-align: left; }
-  .q { margin: 16px 0; padding: 12px 14px; border: 1px solid #e5e5e5; border-radius: 10px; }
-  .qtitle { font-weight: 800; margin-bottom: 10px; }
-  .likert-row { display:flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-  .likert-row label { display:inline-flex; align-items:center; gap: 6px; font-size: 18px; }
+  .q { margin: 10px 0; padding: 10px 12px; border: 1px solid #e5e5e5; border-radius: 10px; }
+  .qtitle { font-weight: 800; margin-bottom: 6px; }
   .likert-anchors { display:flex; justify-content: space-between; font-size: 14px; color:#666; margin-top: 6px; }
+  .likert-hint { font-size: 16px; font-style: italic; color:#666; margin-top: 6px; }
 `;
 document.head.appendChild(style);
 
@@ -106,24 +107,13 @@ jsPsych.data.addProperties({ participantID });
 
 /* ---------- Deterministic counterbalancing ----------
    For each face (1..6), pick version (1..3) based on participantID + faceIndex.
-   This spreads versions roughly evenly per face across participants.
 ---------------------------------------------------- */
 function assignedVersionForFace(faceIndex) {
-  // faceIndex: 1..6
   const pidNum = Number(participantID) || 0;
   return ((pidNum + faceIndex) % 3) + 1; // 1..3
 }
 
-/* ---------- IMAGE PATH (EDIT THIS if your filenames differ) ----------
-   Expected:
-     all_images/male_face01_v1.png
-     all_images/male_face01_v2.png
-     all_images/male_face01_v3.png
-     ...
-     all_images/male_face06_v3.png
-
-   If your actual filenames are different, change this function ONLY.
----------------------------------------------------- */
+/* ---------- IMAGE PATH (EDIT THIS if your filenames differ) ---------- */
 function imagePath(faceIndex, version) {
   const f = String(faceIndex).padStart(2, "0");
   return `all_images/male_face${f}_v${version}.png`;
@@ -143,22 +133,20 @@ const selectedStimuli = faces.map((faceIndex) => {
 // randomize order of the 6 faces for this participant
 const randomizedStimuli = jsPsych.randomization.shuffle(selectedStimuli);
 
-// store assignment in Firebase meta (so you can audit counterbalancing)
+// store assignment in Firebase meta (audit counterbalancing)
 database.ref(`participants/${participantID}/meta/version_assignment`).set({
   participantID,
   assignments: selectedStimuli,
   timestamp: Date.now()
 });
 
-/* ---------- Preload only what this participant will see ----------
-   (plus anything else you want to preload)
----------------------------------------------------- */
+/* ---------- Preload only what this participant will see ---------- */
 const preload = {
   type: jsPsychPreload,
   images: randomizedStimuli.map(s => s.path)
 };
 
-/* ---------- Consent (same style; keep your exact text here) ---------- */
+/* ---------- Consent (same style; your text as provided) ---------- */
 const consent = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
@@ -352,17 +340,7 @@ const instructions = {
   choices: [" "]
 };
 
-/* ---------- Likert (radio) builder ---------- */
-function likertRow(name) {
-  // 1..7 radio buttons, required so they cannot continue without answering
-  const opts = [1,2,3,4,5,6,7].map(v => {
-    return `<label><input type="radio" name="${name}" value="${v}" required> ${v}</label>`;
-  }).join("");
-  return `<div class="likert-row">${opts}</div>
-          <div class="likert-anchors"><span>1</span><span>7</span></div>`;
-}
-
-/* ---------- Single trial per image (4 questions on same page) ---------- */
+/* ---------- Single trial per image (4 Likert sliders on one page) ---------- */
 function makeImageTrial(stim, imageIndex, totalImages) {
   const preamble = `
     <div class="img-counter">Image ${imageIndex} of ${totalImages}</div>
@@ -372,27 +350,21 @@ function makeImageTrial(stim, imageIndex, totalImages) {
     </div>
   `;
 
+  const oneSlider = (name, title, left, right) => `
+    <div class="q">
+      <div class="qtitle">${title}</div>
+      <input class="likert-slider" type="range" name="${name}" min="1" max="7" step="1" value="4" style="width:100%;">
+      <div class="likert-anchors"><span>${left}</span><span>${right}</span></div>
+      <div class="likert-hint">Click or move the slider to confirm your answer.</div>
+    </div>
+  `;
+
   const html = `
     <div class="qblock">
-      <div class="q">
-        <div class="qtitle">How dominant does this individual look? (1 = Not at all, 7 = Very)</div>
-        ${likertRow("dominant")}
-      </div>
-
-      <div class="q">
-        <div class="qtitle">How trustworthy does this individual look? (1 = Not at all, 7 = Very)</div>
-        ${likertRow("trustworthy")}
-      </div>
-
-      <div class="q">
-        <div class="qtitle">How attractive does this individual look? (1 = Not at all, 7 = Very)</div>
-        ${likertRow("attractive")}
-      </div>
-
-      <div class="q">
-        <div class="qtitle">How tall does this individual look? (1 = Not tall at all, 7 = Very tall)</div>
-        ${likertRow("tall")}
-      </div>
+      ${oneSlider("dominant", "How dominant does this individual look?", "1 (Not at all)", "7 (Very)")}
+      ${oneSlider("trustworthy", "How trustworthy does this individual look?", "1 (Not at all)", "7 (Very)")}
+      ${oneSlider("attractive", "How attractive does this individual look?", "1 (Not at all)", "7 (Very)")}
+      ${oneSlider("tall", "How tall does this individual look?", "1 (Not at all)", "7 (Very)")}
     </div>
   `;
 
@@ -408,14 +380,43 @@ function makeImageTrial(stim, imageIndex, totalImages) {
       stimulus: stim.path,
       image_in_task: imageIndex
     },
-    on_finish: (data) => {
-      // save parsed fields onto the row for convenience
-      data.dominant = data.response?.dominant ?? "";
-      data.trustworthy = data.response?.trustworthy ?? "";
-      data.attractive = data.response?.attractive ?? "";
-      data.tall = data.response?.tall ?? "";
 
-      // log one record per image (all 4 answers together)
+    on_load: () => {
+      const display = jsPsych.getDisplayElement();
+      const btn = display.querySelector(".jspsych-btn");
+      if (btn) btn.disabled = true;
+
+      const touched = { dominant: false, trustworthy: false, attractive: false, tall: false };
+      const updateBtn = () => {
+        const allDone = Object.values(touched).every(Boolean);
+        if (btn) btn.disabled = !allDone;
+      };
+
+      const sliders = Array.from(display.querySelectorAll('input[type="range"]'));
+      sliders.forEach((sl) => {
+        const nm = sl.getAttribute("name");
+        const markTouched = () => {
+          if (Object.prototype.hasOwnProperty.call(touched, nm)) {
+            touched[nm] = true;
+            updateBtn();
+          }
+        };
+
+        // Any interaction counts, even if they keep it at 4
+        sl.addEventListener("pointerdown", markTouched);
+        sl.addEventListener("mousedown", markTouched);
+        sl.addEventListener("click", markTouched);
+        sl.addEventListener("input", markTouched);
+        sl.addEventListener("change", markTouched);
+        sl.addEventListener("touchstart", markTouched, { passive: true });
+      });
+
+      updateBtn();
+    },
+
+    on_finish: (data) => {
+      const resp = data.response || {};
+
       const entry = {
         participantID,
         modality: "image",
@@ -423,13 +424,14 @@ function makeImageTrial(stim, imageIndex, totalImages) {
         version: stim.version,
         stimulus: stim.path,
         image_in_task: imageIndex,
-        dominant: data.dominant,
-        trustworthy: data.trustworthy,
-        attractive: data.attractive,
-        tall: data.tall,
+        dominant: resp.dominant ?? "",
+        trustworthy: resp.trustworthy ?? "",
+        attractive: resp.attractive ?? "",
+        tall: resp.tall ?? "",
         rt: data.rt ?? "",
         timestamp: Date.now()
       };
+
       database.ref(`participants/${participantID}/trials`).push(entry);
     }
   };
