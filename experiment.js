@@ -4,10 +4,11 @@
  * - 6 male faces, each has 3 versions (18 total images)
  * - Each participant sees 6 images total:
  *     one version per face (counterbalanced per face)
- * - 4 Likert-style slider questions on the SAME page under the image
+ * - 4 Likert-style SLIDER questions on the SAME page under the image
  *     (dominance, trustworthiness, attractiveness, tall)
- * - Cannot continue unless ALL 4 questions are actively answered
- *     (participant must click/move each slider at least once, even if staying at 4)
+ * - Shows all numbers 1–7 under each slider
+ * - Cannot continue unless ALL 4 sliders are actively interacted with
+ *     (even if they keep the default value of 4)
  *
  * Keeps:
  * - Consent page same style (scroll-to-enable)
@@ -16,7 +17,7 @@
  * - End page
  ****************************************************/
 
-/* ---------- Global style injection (font + progress bar + forms) ---------- */
+/* ---------- Global style injection (font + progress bar + compact layout) ---------- */
 var style = document.createElement("style");
 style.innerHTML = `
   body { font-size: 23px !important; }
@@ -59,21 +60,29 @@ style.innerHTML = `
 
   .img-counter {
     text-align: center;
-    font-size: 20px;
+    font-size: 18px;
     color: #666;
-    margin: 8px 0 6px;
+    margin: 6px 0 6px;
     font-weight: 600;
   }
 
   .stim-wrap { max-width: 900px; margin: 0 auto; text-align: center; }
-  .stim-img { height: 260px; display:block; margin: 0 auto 8px; }
-  .small-note { font-style: italic; color: #555; margin: 4px 0 10px; }
+  .stim-img { height: 220px; display:block; margin: 0 auto 6px; }
+  .small-note { font-style: italic; color: #555; margin: 2px 0 6px; font-size: 16px; }
 
   .qblock { max-width: 900px; margin: 0 auto; text-align: left; }
-  .q { margin: 10px 0; padding: 10px 12px; border: 1px solid #e5e5e5; border-radius: 10px; }
-  .qtitle { font-weight: 800; margin-bottom: 6px; }
-  .likert-anchors { display:flex; justify-content: space-between; font-size: 14px; color:#666; margin-top: 6px; }
-  .likert-hint { font-size: 16px; font-style: italic; color:#666; margin-top: 6px; }
+  .q { margin: 6px 0; padding: 8px 10px; border: 1px solid #e5e5e5; border-radius: 10px; }
+  .qtitle { font-weight: 800; margin-bottom: 4px; font-size: 18px; }
+
+  .likert-slider { margin-top: 2px; width: 100%; }
+  .likert-numbers {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #666;
+    margin-top: 2px;
+    padding: 0 2px;
+  }
 `;
 document.head.appendChild(style);
 
@@ -123,11 +132,7 @@ function imagePath(faceIndex, version) {
 const faces = [1, 2, 3, 4, 5, 6];
 const selectedStimuli = faces.map((faceIndex) => {
   const v = assignedVersionForFace(faceIndex);
-  return {
-    faceIndex,
-    version: v,
-    path: imagePath(faceIndex, v)
-  };
+  return { faceIndex, version: v, path: imagePath(faceIndex, v) };
 });
 
 // randomize order of the 6 faces for this participant
@@ -143,10 +148,10 @@ database.ref(`participants/${participantID}/meta/version_assignment`).set({
 /* ---------- Preload only what this participant will see ---------- */
 const preload = {
   type: jsPsychPreload,
-  images: randomizedStimuli.map(s => s.path)
+  images: randomizedStimuli.map((s) => s.path)
 };
 
-/* ---------- Consent (same style; your text as provided) ---------- */
+/* ---------- Consent (same style; keep your exact text here) ---------- */
 const consent = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
@@ -327,20 +332,20 @@ const demographics = {
   }
 };
 
-/* ---------- Instructions (updated for 6 images) ---------- */
+/* ---------- Instructions ---------- */
 const instructions = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <h2>Instructions</h2>
     <p>You will see <b>6 images</b> (one image per face).</p>
     <p>For each image, you will answer <b>4 questions</b> on the same page.</p>
-    <p>You must answer all 4 questions before continuing.</p>
-    <p style="margin-top: 40px;">Press SPACE to begin.</p>
+    <p>You must interact with all 4 scales before continuing.</p>
+    <p style="margin-top: 30px;">Press SPACE to begin.</p>
   `,
   choices: [" "]
 };
 
-/* ---------- Single trial per image (4 Likert sliders on one page) ---------- */
+/* ---------- Single trial per image (4 Likert sliders on one page + numbers 1–7) ---------- */
 function makeImageTrial(stim, imageIndex, totalImages) {
   const preamble = `
     <div class="img-counter">Image ${imageIndex} of ${totalImages}</div>
@@ -350,21 +355,22 @@ function makeImageTrial(stim, imageIndex, totalImages) {
     </div>
   `;
 
-  const oneSlider = (name, title, left, right) => `
+  const oneSlider = (name, title) => `
     <div class="q">
       <div class="qtitle">${title}</div>
-      <input class="likert-slider" type="range" name="${name}" min="1" max="7" step="1" value="4" style="width:100%;">
-      <div class="likert-anchors"><span>${left}</span><span>${right}</span></div>
-      <div class="likert-hint">Click or move the slider to confirm your answer.</div>
+      <input class="likert-slider" type="range" name="${name}" min="1" max="7" step="1" value="4">
+      <div class="likert-numbers">
+        <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span>
+      </div>
     </div>
   `;
 
   const html = `
     <div class="qblock">
-      ${oneSlider("dominant", "How dominant does this individual look?", "1 (Not at all)", "7 (Very)")}
-      ${oneSlider("trustworthy", "How trustworthy does this individual look?", "1 (Not at all)", "7 (Very)")}
-      ${oneSlider("attractive", "How attractive does this individual look?", "1 (Not at all)", "7 (Very)")}
-      ${oneSlider("tall", "How tall does this individual look?", "1 (Not at all)", "7 (Very)")}
+      ${oneSlider("dominant", "How dominant does this individual look?")}
+      ${oneSlider("trustworthy", "How trustworthy does this individual look?")}
+      ${oneSlider("attractive", "How attractive does this individual look?")}
+      ${oneSlider("tall", "How tall does this individual look?")}
     </div>
   `;
 
@@ -402,7 +408,7 @@ function makeImageTrial(stim, imageIndex, totalImages) {
           }
         };
 
-        // Any interaction counts, even if they keep it at 4
+        // Any interaction counts, even if value stays 4
         sl.addEventListener("pointerdown", markTouched);
         sl.addEventListener("mousedown", markTouched);
         sl.addEventListener("click", markTouched);
@@ -495,7 +501,7 @@ const cloudIdTrial = {
   }
 };
 
-/* ---------- End screen (same as your prior) ---------- */
+/* ---------- End screen ---------- */
 const endScreen = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
@@ -513,7 +519,11 @@ timeline.push(preload);
 timeline.push(consent);
 
 timeline.push({
-  timeline: [noConsentEnd],
+  timeline: [{
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `<h2>You chose not to participate.</h2><p>You may now close this tab/window.</p>`,
+    choices: "NO_KEYS"
+  }],
   conditional_function: () => {
     const c = jsPsych.data.get().filter({ trial_type: "consent" }).last(1).values()[0];
     return c && c.consented === false;
