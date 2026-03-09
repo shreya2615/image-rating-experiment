@@ -1,14 +1,18 @@
 /****************************************************
  * jsPsych v7 + Firebase RTDB (compat)
- * NEW DESIGN:
- * - 6 male faces, each has 3 versions (18 total images)
- * - Each participant sees 6 images total:
+ * UPDATED DESIGN:
+ * - 10 male faces, each has 3 versions (30 total images)
+ * - Each participant sees 10 images total:
  *     one version per face (counterbalanced per face)
  * - 4 Likert-style SLIDER questions on the SAME page under the image
  *     (dominance, trustworthiness, attractiveness, tall)
  * - Shows all numbers 1–7 under each slider
  * - Cannot continue unless ALL 4 sliders are actively interacted with
  *     (even if they keep the default value of 4)
+ *
+ * OPTION A:
+ * - Make the stimulus + question area wider across the screen
+ *   (qblock + stim-wrap use width:95vw and max-width:1200px)
  *
  * Keeps:
  * - Consent page same style (scroll-to-enable)
@@ -66,11 +70,14 @@ style.innerHTML = `
     font-weight: 600;
   }
 
+  /* OPTION A: wider content */
   .stim-wrap { max-width: 1200px; width: 95vw; margin: 0 auto; text-align: center; }
+  .qblock   { max-width: 1200px; width: 95vw; margin: 0 auto; text-align: left; }
+
   .stim-img { height: 300px; display:block; margin: 0 auto 6px; }
   .small-note { font-style: italic; color: #555; margin: 2px 0 6px; font-size: 16px; }
 
-  .qblock { max-width: 1200px; width: 95vw; margin: 0 auto; text-align: left; }
+  /* no border around scales */
   .q { margin: 2px 0; padding: 4px 0; border: none; border-radius: 0; }
   .qtitle { font-weight: 800; margin-bottom: 2px; font-size: 18px; }
 
@@ -115,7 +122,8 @@ const participantID =
 jsPsych.data.addProperties({ participantID });
 
 /* ---------- Deterministic counterbalancing ----------
-   For each face (1..6), pick version (1..3) based on participantID + faceIndex.
+   For each face (1..10), pick version (1..3) based on participantID + faceIndex.
+   This spreads versions roughly evenly per face across participants.
 ---------------------------------------------------- */
 function assignedVersionForFace(faceIndex) {
   const pidNum = Number(participantID) || 0;
@@ -128,14 +136,15 @@ function imagePath(faceIndex, version) {
   return `all_images/male_face${f}_v${version}.png`;
 }
 
-/* ---------- Build the 6 stimulus images (one per face) ---------- */
-const faces = [1, 2, 3, 4, 5, 6];
+/* ---------- Build the 10 stimulus images (one per face) ---------- */
+const faces = [1,2,3,4,5,6,7,8,9,10];
+
 const selectedStimuli = faces.map((faceIndex) => {
   const v = assignedVersionForFace(faceIndex);
   return { faceIndex, version: v, path: imagePath(faceIndex, v) };
 });
 
-// randomize order of the 6 faces for this participant
+// randomize order of the 10 faces for this participant
 const randomizedStimuli = jsPsych.randomization.shuffle(selectedStimuli);
 
 // store assignment in Firebase meta (audit counterbalancing)
@@ -151,7 +160,7 @@ const preload = {
   images: randomizedStimuli.map((s) => s.path)
 };
 
-/* ---------- Consent (same style; keep your exact text here) ---------- */
+/* ---------- Consent ---------- */
 const consent = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
@@ -230,7 +239,7 @@ const noConsentEnd = {
   choices: "NO_KEYS"
 };
 
-/* ---------- Demographics (same structure; includes ethnicity) ---------- */
+/* ---------- Demographics ---------- */
 const demographics = {
   type: jsPsychSurveyHtmlForm,
   preamble: `
@@ -337,7 +346,7 @@ const instructions = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <h2>Instructions</h2>
-    <p>You will see <b>6 images</b> (one image per face).</p>
+    <p>You will see <b>10 images</b> (one image per face).</p>
     <p>For each image, you will answer <b>4 questions</b> on the same page.</p>
     <p>You must interact with all 4 scales before continuing.</p>
     <p style="margin-top: 30px;">Press SPACE to begin.</p>
@@ -345,7 +354,7 @@ const instructions = {
   choices: [" "]
 };
 
-/* ---------- Single trial per image (4 Likert sliders on one page + numbers 1–7) ---------- */
+/* ---------- Single trial per image (4 Likert sliders + numbers 1–7) ---------- */
 function makeImageTrial(stim, imageIndex, totalImages) {
   const preamble = `
     <div class="img-counter">Image ${imageIndex} of ${totalImages}</div>
@@ -367,10 +376,10 @@ function makeImageTrial(stim, imageIndex, totalImages) {
 
   const html = `
     <div class="qblock">
-      ${oneSlider("dominant", "How dominant does this individual look?")}
-      ${oneSlider("trustworthy", "How trustworthy does this individual look?")}
-      ${oneSlider("attractive", "How attractive does this individual look?")}
-      ${oneSlider("tall", "How tall does this individual look?")}
+      ${oneSlider("dominant", "1. How dominant does this individual look?")}
+      ${oneSlider("trustworthy", "2. How trustworthy does this individual look?")}
+      ${oneSlider("attractive", "3. How attractive does this individual look?")}
+      ${oneSlider("tall", "4. How tall does this individual look?")}
     </div>
   `;
 
@@ -408,7 +417,6 @@ function makeImageTrial(stim, imageIndex, totalImages) {
           }
         };
 
-        // Any interaction counts, even if value stays 4
         sl.addEventListener("pointerdown", markTouched);
         sl.addEventListener("mousedown", markTouched);
         sl.addEventListener("click", markTouched);
@@ -443,7 +451,7 @@ function makeImageTrial(stim, imageIndex, totalImages) {
   };
 }
 
-/* ---------- Build trials (6 images total) ---------- */
+/* ---------- Build trials (10 images total) ---------- */
 const TOTAL_IMAGES = randomizedStimuli.length;
 const imageTrials = randomizedStimuli.map((stim, idx) =>
   makeImageTrial(stim, idx + 1, TOTAL_IMAGES)
