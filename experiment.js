@@ -376,6 +376,7 @@ const instructions = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <h2>Instructions</h2>
+    <p><b>Welcome to the study.</b></p>
     <p>You will see a total of <b>10 images</b>.</p>
     <p>For each image, you will answer <b>4 questions</b> using a likert scale.</p>
     <p>Please view the image and answer the associated questions below it.</p>
@@ -393,7 +394,7 @@ const exampleTrial = {
     </div>
     <div class="img-counter">Example</div>
     <div class="stim-wrap">
-      <div class="small-note">The image may take a few seconds to load.</div>
+      <div class="small-note">Please scroll down to view all the questions and the continue button.</div>
       <img class="stim-img" src="${exampleImage}" alt="example image">
     </div>
   `,
@@ -472,7 +473,7 @@ function makeImageTrial(stim, imageIndex, totalImages) {
   const preamble = `
     <div class="img-counter">Image ${imageIndex} of ${totalImages}</div>
     <div class="stim-wrap">
-      <div class="small-note">The image may take a few seconds to load.</div>
+      <div class="small-note">Please scroll down to view all questions and the continue button.</div>
       <img class="stim-img" src="${stim.path}" alt="stimulus image">
     </div>
   `;
