@@ -1,18 +1,18 @@
 /****************************************************
  * jsPsych v7 + Firebase RTDB (compat)
- * UPDATED DESIGN:
+ * UPDATED DESIGN (10 faces):
  * - 10 male faces, each has 3 versions (30 total images)
  * - Each participant sees 10 images total:
  *     one version per face (counterbalanced per face)
  * - 4 Likert-style SLIDER questions on the SAME page under the image
  *     (dominance, trustworthiness, attractiveness, tall)
- * - Shows all numbers 1–7 under each slider
+ * - Shows all numbers 1–7 under the 3 Likert sliders
+ * - Tall question uses a HEIGHT scale (5'5" to 6'5")
  * - Cannot continue unless ALL 4 sliders are actively interacted with
- *     (even if they keep the default value of 4)
+ *     (even if they keep the default value)
  *
  * OPTION A:
- * - Make the stimulus + question area wider across the screen
- *   (qblock + stim-wrap use width:95vw and max-width:1200px)
+ * - Wider stimulus + question area (95vw, max 1200px)
  *
  * Keeps:
  * - Consent page same style (scroll-to-enable)
@@ -21,7 +21,7 @@
  * - End page
  ****************************************************/
 
-/* ---------- Global style injection (font + progress bar + compact layout) ---------- */
+/* ---------- Global style injection ---------- */
 var style = document.createElement("style");
 style.innerHTML = `
   body { font-size: 23px !important; }
@@ -90,6 +90,16 @@ style.innerHTML = `
     margin-top: 2px;
     padding: 0 2px;
   }
+
+  /* height labels are more cramped; make them smaller */
+  .height-numbers {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #666;
+    margin-top: 2px;
+    padding: 0 2px;
+  }
 `;
 document.head.appendChild(style);
 
@@ -121,9 +131,15 @@ const participantID =
 
 jsPsych.data.addProperties({ participantID });
 
+/* ---------- Height labels for tall question ---------- */
+/* 5'5" to 6'5" (1-inch steps) */
+const heightLabels = [
+  `5'5"`,`5'6"`,`5'7"`,`5'8"`,`5'9"`,`5'10"`,`5'11"`,
+  `6'0"`,`6'1"`,`6'2"`,`6'3"`,`6'4"`,`6'5"`
+];
+
 /* ---------- Deterministic counterbalancing ----------
    For each face (1..10), pick version (1..3) based on participantID + faceIndex.
-   This spreads versions roughly evenly per face across participants.
 ---------------------------------------------------- */
 function assignedVersionForFace(faceIndex) {
   const pidNum = Number(participantID) || 0;
@@ -354,7 +370,7 @@ const instructions = {
   choices: [" "]
 };
 
-/* ---------- Single trial per image (4 Likert sliders + numbers 1–7) ---------- */
+/* ---------- Single trial per image ---------- */
 function makeImageTrial(stim, imageIndex, totalImages) {
   const preamble = `
     <div class="img-counter">Image ${imageIndex} of ${totalImages}</div>
@@ -364,7 +380,7 @@ function makeImageTrial(stim, imageIndex, totalImages) {
     </div>
   `;
 
-  const oneSlider = (name, title) => `
+  const likertSlider = (name, title) => `
     <div class="q">
       <div class="qtitle">${title}</div>
       <input class="likert-slider" type="range" name="${name}" min="1" max="7" step="1" value="4">
@@ -374,12 +390,22 @@ function makeImageTrial(stim, imageIndex, totalImages) {
     </div>
   `;
 
+  const heightSlider = () => `
+    <div class="q">
+      <div class="qtitle">4. How tall does this individual look?</div>
+      <input class="likert-slider" type="range" name="tall" min="0" max="${heightLabels.length - 1}" step="1" value="6">
+      <div class="height-numbers">
+        ${heightLabels.map(h => `<span>${h}</span>`).join("")}
+      </div>
+    </div>
+  `;
+
   const html = `
     <div class="qblock">
-      ${oneSlider("dominant", "1. How dominant does this individual look?")}
-      ${oneSlider("trustworthy", "2. How trustworthy does this individual look?")}
-      ${oneSlider("attractive", "3. How attractive does this individual look?")}
-      ${oneSlider("tall", "4. How tall does this individual look?")}
+      ${likertSlider("dominant", "1. How dominant does this individual look? (1 = Not at all dominant, 7 = Very dominant)")}
+      ${likertSlider("trustworthy", "2. How trustworthy does this individual look? (1 = Not at all trustworthy, 7 = Very trustworthy)")}
+      ${likertSlider("attractive", "3. How attractive does this individual look? (1 = Not at all attractive, 7 = Very attractive)")}
+      ${heightSlider()}
     </div>
   `;
 
@@ -401,6 +427,7 @@ function makeImageTrial(stim, imageIndex, totalImages) {
       const btn = display.querySelector(".jspsych-btn");
       if (btn) btn.disabled = true;
 
+      // require interaction with each slider
       const touched = { dominant: false, trustworthy: false, attractive: false, tall: false };
       const updateBtn = () => {
         const allDone = Object.values(touched).every(Boolean);
@@ -431,6 +458,10 @@ function makeImageTrial(stim, imageIndex, totalImages) {
     on_finish: (data) => {
       const resp = data.response || {};
 
+      // convert tall index -> actual height label
+      const tallIdx = Number(resp.tall);
+      const tallHeight = Number.isFinite(tallIdx) ? (heightLabels[tallIdx] || "") : "";
+
       const entry = {
         participantID,
         modality: "image",
@@ -438,10 +469,14 @@ function makeImageTrial(stim, imageIndex, totalImages) {
         version: stim.version,
         stimulus: stim.path,
         image_in_task: imageIndex,
+
         dominant: resp.dominant ?? "",
         trustworthy: resp.trustworthy ?? "",
         attractive: resp.attractive ?? "",
-        tall: resp.tall ?? "",
+
+        tall_height: tallHeight,
+        tall_index: resp.tall ?? "",
+
         rt: data.rt ?? "",
         timestamp: Date.now()
       };
@@ -527,11 +562,7 @@ timeline.push(preload);
 timeline.push(consent);
 
 timeline.push({
-  timeline: [{
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: `<h2>You chose not to participate.</h2><p>You may now close this tab/window.</p>`,
-    choices: "NO_KEYS"
-  }],
+  timeline: [noConsentEnd],
   conditional_function: () => {
     const c = jsPsych.data.get().filter({ trial_type: "consent" }).last(1).values()[0];
     return c && c.consented === false;
