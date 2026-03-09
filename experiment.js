@@ -9,10 +9,13 @@
  * - Shows all numbers 1–7 under the 3 Likert sliders
  * - Tall question uses a HEIGHT scale (5'5" to 6'5")
  * - Cannot continue unless ALL 4 sliders are actively interacted with
- *     (even if they keep the default value)
  *
  * OPTION A:
  * - Wider stimulus + question area (95vw, max 1200px)
+ *
+ * NEW:
+ * - Example page after instructions, using all_images/example1.png
+ *   (same layout as real trials, must interact with all 4 sliders to continue)
  *
  * Keeps:
  * - Consent page same style (scroll-to-enable)
@@ -100,6 +103,16 @@ style.innerHTML = `
     margin-top: 2px;
     padding: 0 2px;
   }
+
+  .example-note {
+    max-width: 1200px;
+    width: 95vw;
+    margin: 8px auto 10px;
+    font-style: italic;
+    color: #555;
+    font-size: 16px;
+    text-align: center;
+  }
 `;
 document.head.appendChild(style);
 
@@ -131,6 +144,9 @@ const participantID =
 
 jsPsych.data.addProperties({ participantID });
 
+/* ---------- Example image (fixed) ---------- */
+const exampleImage = "all_images/example1.png";
+
 /* ---------- Height labels for tall question ---------- */
 /* 5'5" to 6'5" (1-inch steps) */
 const heightLabels = [
@@ -138,9 +154,7 @@ const heightLabels = [
   `6'0"`,`6'1"`,`6'2"`,`6'3"`,`6'4"`,`6'5"`
 ];
 
-/* ---------- Deterministic counterbalancing ----------
-   For each face (1..10), pick version (1..3) based on participantID + faceIndex.
----------------------------------------------------- */
+/* ---------- Deterministic counterbalancing ---------- */
 function assignedVersionForFace(faceIndex) {
   const pidNum = Number(participantID) || 0;
   return ((pidNum + faceIndex) % 3) + 1; // 1..3
@@ -170,10 +184,10 @@ database.ref(`participants/${participantID}/meta/version_assignment`).set({
   timestamp: Date.now()
 });
 
-/* ---------- Preload only what this participant will see ---------- */
+/* ---------- Preload (include example1.png) ---------- */
 const preload = {
   type: jsPsychPreload,
-  images: randomizedStimuli.map((s) => s.path)
+  images: [exampleImage, ...randomizedStimuli.map((s) => s.path)]
 };
 
 /* ---------- Consent ---------- */
@@ -362,15 +376,98 @@ const instructions = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <h2>Instructions</h2>
-    <p>You will see <b>10 images</b> (one image per face).</p>
-    <p>For each image, you will answer <b>4 questions</b> on the same page.</p>
-    <p>You must interact with all 4 scales before continuing.</p>
-    <p style="margin-top: 30px;">Press SPACE to begin.</p>
+    <p>You will see a total of <b>10 images</b>.</p>
+    <p>For each image, you will answer <b>4 questions</b> using a likert scale.</p>
+    <p>Please view the image and answer the associated questions below it.</p>
+    <p style="margin-top: 30px;">Press SPACE to see an example.</p>
   `,
   choices: [" "]
 };
 
-/* ---------- Single trial per image ---------- */
+/* ---------- Example page (uses example1.png; no logging) ---------- */
+const exampleTrial = {
+  type: jsPsychSurveyHtmlForm,
+  preamble: `
+    <div class="example-note">
+      Example page (not part of the study). Please interact with all 4 sliders to enable Continue.
+    </div>
+    <div class="img-counter">Example</div>
+    <div class="stim-wrap">
+      <div class="small-note">The image may take a few seconds to load.</div>
+      <img class="stim-img" src="${exampleImage}" alt="example image">
+    </div>
+  `,
+  html: `
+    <div class="qblock">
+      <div class="q">
+        <div class="qtitle">1. How dominant does this individual look? (1 = Not at all dominant, 7 = Very dominant)</div>
+        <input class="likert-slider" type="range" name="dominant" min="1" max="7" step="1" value="4">
+        <div class="likert-numbers"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span></div>
+      </div>
+
+      <div class="q">
+        <div class="qtitle">2. How trustworthy does this individual look? (1 = Not at all trustworthy, 7 = Very trustworthy)</div>
+        <input class="likert-slider" type="range" name="trustworthy" min="1" max="7" step="1" value="4">
+        <div class="likert-numbers"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span></div>
+      </div>
+
+      <div class="q">
+        <div class="qtitle">3. How attractive does this individual look? (1 = Not at all attractive, 7 = Very attractive)</div>
+        <input class="likert-slider" type="range" name="attractive" min="1" max="7" step="1" value="4">
+        <div class="likert-numbers"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span></div>
+      </div>
+
+      <div class="q">
+        <div class="qtitle">4. How tall does this individual look?</div>
+        <input class="likert-slider" type="range" name="tall" min="0" max="${heightLabels.length - 1}" step="1" value="6">
+        <div class="height-numbers">${heightLabels.map(h => `<span>${h}</span>`).join("")}</div>
+      </div>
+    </div>
+  `,
+  button_label: "Continue",
+  on_load: () => {
+    const display = jsPsych.getDisplayElement();
+    const btn = display.querySelector(".jspsych-btn");
+    if (btn) btn.disabled = true;
+
+    const touched = { dominant: false, trustworthy: false, attractive: false, tall: false };
+    const updateBtn = () => {
+      const allDone = Object.values(touched).every(Boolean);
+      if (btn) btn.disabled = !allDone;
+    };
+
+    const sliders = Array.from(display.querySelectorAll('input[type="range"]'));
+    sliders.forEach((sl) => {
+      const nm = sl.getAttribute("name");
+      const markTouched = () => {
+        if (Object.prototype.hasOwnProperty.call(touched, nm)) {
+          touched[nm] = true;
+          updateBtn();
+        }
+      };
+
+      sl.addEventListener("pointerdown", markTouched);
+      sl.addEventListener("mousedown", markTouched);
+      sl.addEventListener("click", markTouched);
+      sl.addEventListener("input", markTouched);
+      sl.addEventListener("change", markTouched);
+      sl.addEventListener("touchstart", markTouched, { passive: true });
+    });
+
+    updateBtn();
+  }
+};
+
+const startReal = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <h2>The study will now begin</h2>
+    <p style="margin-top: 30px;"><b>Press SPACE to start.</b></p>
+  `,
+  choices: [" "]
+};
+
+/* ---------- Real trials ---------- */
 function makeImageTrial(stim, imageIndex, totalImages) {
   const preamble = `
     <div class="img-counter">Image ${imageIndex} of ${totalImages}</div>
@@ -427,7 +524,6 @@ function makeImageTrial(stim, imageIndex, totalImages) {
       const btn = display.querySelector(".jspsych-btn");
       if (btn) btn.disabled = true;
 
-      // require interaction with each slider
       const touched = { dominant: false, trustworthy: false, attractive: false, tall: false };
       const updateBtn = () => {
         const allDone = Object.values(touched).every(Boolean);
@@ -457,8 +553,6 @@ function makeImageTrial(stim, imageIndex, totalImages) {
 
     on_finish: (data) => {
       const resp = data.response || {};
-
-      // convert tall index -> actual height label
       const tallIdx = Number(resp.tall);
       const tallHeight = Number.isFinite(tallIdx) ? (heightLabels[tallIdx] || "") : "";
 
@@ -469,14 +563,11 @@ function makeImageTrial(stim, imageIndex, totalImages) {
         version: stim.version,
         stimulus: stim.path,
         image_in_task: imageIndex,
-
         dominant: resp.dominant ?? "",
         trustworthy: resp.trustworthy ?? "",
         attractive: resp.attractive ?? "",
-
         tall_height: tallHeight,
         tall_index: resp.tall ?? "",
-
         rt: data.rt ?? "",
         timestamp: Date.now()
       };
@@ -573,6 +664,8 @@ timeline.push({
   timeline: [
     demographics,
     instructions,
+    exampleTrial,
+    startReal,
     ...imageTrials,
     cloudIdTrial,
     endScreen
