@@ -713,7 +713,7 @@ const endScreen = {
     <p>You may now close this window.</p>
   `,
   choices: "NO_KEYS",
-  trial_duration: 4000
+  trial_duration: 6000
 };
 
 /* ---------- Timeline with consent branching ---------- */
