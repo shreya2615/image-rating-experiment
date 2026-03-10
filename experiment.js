@@ -123,8 +123,7 @@ const database = firebase.database();
 
 /* ---------- jsPsych init ---------- */
 const jsPsych = initJsPsych({
-  show_progress_bar: true,
-  auto_update_progress_bar: true
+  show_progress_bar: false,
 });
 
 /* ---------- Participant ID ---------- */
