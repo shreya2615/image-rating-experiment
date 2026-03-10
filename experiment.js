@@ -1,25 +1,17 @@
 /****************************************************
  * jsPsych v7 + Firebase RTDB (compat)
- * UPDATED DESIGN (10 faces):
- * - 10 male faces, each has 3 versions (30 total images)
- * - Each participant sees 10 images total:
- *     one version per face (counterbalanced per face)
- * - 4 Likert-style SLIDER questions on the SAME page under the image
- *     (dominance, trustworthiness, attractiveness, tall)
- * - Shows all numbers 1–7 under the 3 Likert sliders
- * - Tall question uses a HEIGHT scale (5'5" to 6'5")
- * - Cannot continue unless ALL 4 sliders are actively interacted with
- *
- * OPTION A:
- * - Wider stimulus + question area (95vw, max 1200px)
- *
- * NEW:
- * - Example page after instructions, using all_images/example1.png
- *   (same layout as real trials, must interact with all 4 sliders to continue)
+ * GUARANTEED COUNTERBALANCING FOR 90 PARTICIPANTS:
+ * - 10 male faces, each has 3 versions (v1,v2,v3)
+ * - Each participant sees 10 images total (one per face)
+ * - EXACTLY 30 participants per counterbalance group (0/1/2) via Firebase transactions
+ *   => for EACH face identity: 30 ratings of v1, 30 of v2, 30 of v3
  *
  * Keeps:
- * - Consent page same style (scroll-to-enable)
- * - Demographics page same dropdown style (ethnicity)
+ * - Consent page (scroll-to-enable)
+ * - Demographics (dropdowns + ethnicity) + Sex (Male/Female)
+ * - Instructions
+ * - Example page using all_images/example1.png
+ * - Start screen
  * - CloudResearch ID page
  * - End page
  ****************************************************/
@@ -73,7 +65,7 @@ style.innerHTML = `
     font-weight: 600;
   }
 
-  /* OPTION A: wider content */
+  /* wider content */
   .stim-wrap { max-width: 1200px; width: 95vw; margin: 0 auto; text-align: center; }
   .qblock   { max-width: 1200px; width: 95vw; margin: 0 auto; text-align: left; }
 
@@ -94,7 +86,6 @@ style.innerHTML = `
     padding: 0 2px;
   }
 
-  /* height labels are more cramped; make them smaller */
   .height-numbers {
     display: flex;
     justify-content: space-between;
@@ -148,46 +139,86 @@ jsPsych.data.addProperties({ participantID });
 const exampleImage = "all_images/example1.png";
 
 /* ---------- Height labels for tall question ---------- */
-/* 5'5" to 6'5" (1-inch steps) */
 const heightLabels = [
   `5'5"`,`5'6"`,`5'7"`,`5'8"`,`5'9"`,`5'10"`,`5'11"`,
   `6'0"`,`6'1"`,`6'2"`,`6'3"`,`6'4"`,`6'5"`
 ];
 
-/* ---------- Deterministic counterbalancing ---------- */
-function assignedVersionForFace(faceIndex) {
-  const pidNum = Number(participantID) || 0;
-  return ((pidNum + faceIndex) % 3) + 1; // 1..3
+/* =========================================================
+   GUARANTEED COUNTERBALANCING (single link)
+   - 90 participants => 30 per group (0/1/2)
+   - Use RTDB: meta/condition_counts/{0,1,2}
+   ========================================================= */
+const TARGET_PER_GROUP = 30;
+let condGroup = null; // will be 0/1/2 after assignment
+
+function assignCondGroupWithQuota() {
+  const countsRef = database.ref("meta/condition_counts");
+
+  return new Promise((resolve, reject) => {
+    let chosen = 0;
+
+    countsRef.transaction(
+      (current) => {
+        const cur = current || { 0: 0, 1: 0, 2: 0 };
+
+        const c0 = Number(cur[0] || 0);
+        const c1 = Number(cur[1] || 0);
+        const c2 = Number(cur[2] || 0);
+
+        const all = [
+          { g: 0, c: c0 },
+          { g: 1, c: c1 },
+          { g: 2, c: c2 }
+        ];
+
+        const eligible = all.filter(x => x.c < TARGET_PER_GROUP);
+        const pick = (eligible.length ? eligible : all).sort((a,b) => a.c - b.c)[0].g;
+
+        chosen = pick;
+        cur[pick] = Number(cur[pick] || 0) + 1;
+
+        return cur;
+      },
+      (error, committed) => {
+        if (error) return reject(error);
+        if (!committed) return reject(new Error("Counterbalance transaction not committed."));
+        resolve(chosen);
+      },
+      false
+    );
+  });
 }
 
-/* ---------- IMAGE PATH (EDIT THIS if your filenames differ) ---------- */
+/* ---------- Version assignment uses condGroup (0/1/2) ---------- */
+function assignedVersionForFace(faceIndex) {
+  // version cycles evenly per face across the 3 groups
+  return ((condGroup + faceIndex) % 3) + 1; // 1..3
+}
+
+/* ---------- IMAGE PATH ---------- */
 function imagePath(faceIndex, version) {
   const f = String(faceIndex).padStart(2, "0");
   return `all_images/male_face${f}_v${version}.png`;
 }
 
-/* ---------- Build the 10 stimulus images (one per face) ---------- */
+/* ---------- Faces ---------- */
 const faces = [1,2,3,4,5,6,7,8,9,10];
 
-const selectedStimuli = faces.map((faceIndex) => {
-  const v = assignedVersionForFace(faceIndex);
-  return { faceIndex, version: v, path: imagePath(faceIndex, v) };
-});
+/* ---------- Stimuli placeholders (filled after condGroup assignment) ---------- */
+let selectedStimuli = [];
+let randomizedStimuli = [];
+let imageTrials = []; // IMPORTANT: keep as same array reference (we will mutate it)
 
-// randomize order of the 10 faces for this participant
-const randomizedStimuli = jsPsych.randomization.shuffle(selectedStimuli);
-
-// store assignment in Firebase meta (audit counterbalancing)
-database.ref(`participants/${participantID}/meta/version_assignment`).set({
-  participantID,
-  assignments: selectedStimuli,
-  timestamp: Date.now()
-});
-
-/* ---------- Preload (include example1.png) ---------- */
-const preload = {
+/* ---------- Preload: only example first; we preload real stimuli later ---------- */
+const preloadExample = {
   type: jsPsychPreload,
-  images: [exampleImage, ...randomizedStimuli.map((s) => s.path)]
+  images: [exampleImage]
+};
+
+const preloadStimuli = {
+  type: jsPsychPreload,
+  images: [] // filled after counterbalancing
 };
 
 /* ---------- Consent ---------- */
@@ -269,7 +300,7 @@ const noConsentEnd = {
   choices: "NO_KEYS"
 };
 
-/* ---------- Demographics ---------- */
+/* ---------- Demographics (Sex + dropdowns) ---------- */
 const demographics = {
   type: jsPsychSurveyHtmlForm,
   preamble: `
@@ -296,13 +327,13 @@ const demographics = {
       </div>
 
       <div class="form-row">
-       <label for="sex">Sex</label>
-       <select name="sex" id="sex" required>
-        <option value="" selected disabled>Select one</option>
-        <option value="Male">Male</option>
-        <option value="Female">Female</option>
-        <option value="Prefer not to say">Prefer not to say</option>
-       </select>
+        <label for="sex">Sex</label>
+        <select name="sex" id="sex" required>
+          <option value="" selected disabled>Select one</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Prefer not to say">Prefer not to say</option>
+        </select>
       </div>
 
       <div class="form-row">
@@ -355,7 +386,7 @@ const demographics = {
     const resp = data.response || {};
     jsPsych.data.addProperties({
       age: resp.age,
-      gender: resp.gender,
+      sex: resp.sex,
       education: resp.education,
       ethnicity: resp.ethnicity,
       country: resp.country
@@ -466,7 +497,7 @@ const startReal = {
   choices: [" "]
 };
 
-/* ---------- Real trials ---------- */
+/* ---------- Real trial builder ---------- */
 function makeImageTrial(stim, imageIndex, totalImages) {
   const preamble = `
     <div class="img-counter">Image ${imageIndex} of ${totalImages}</div>
@@ -515,7 +546,8 @@ function makeImageTrial(stim, imageIndex, totalImages) {
       face_index: stim.faceIndex,
       version: stim.version,
       stimulus: stim.path,
-      image_in_task: imageIndex
+      image_in_task: imageIndex,
+      cond_group: condGroup
     },
 
     on_load: () => {
@@ -558,6 +590,7 @@ function makeImageTrial(stim, imageIndex, totalImages) {
       const entry = {
         participantID,
         modality: "image",
+        cond_group: condGroup,
         face_index: stim.faceIndex,
         version: stim.version,
         stimulus: stim.path,
@@ -576,11 +609,49 @@ function makeImageTrial(stim, imageIndex, totalImages) {
   };
 }
 
-/* ---------- Build trials (10 images total) ---------- */
-const TOTAL_IMAGES = randomizedStimuli.length;
-const imageTrials = randomizedStimuli.map((stim, idx) =>
-  makeImageTrial(stim, idx + 1, TOTAL_IMAGES)
-);
+/* ---------- Setup trial: assigns condGroup, builds stimuli + trials, preloads stimuli ---------- */
+const setupCounterbalance = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `<p>Loading…</p>`,
+  choices: "NO_KEYS",
+  trial_duration: 10,
+  on_start: async () => {
+    // 1) Assign condGroup (0/1/2) with exact quota of 30 each
+    condGroup = await assignCondGroupWithQuota();
+
+    // 2) Build stimuli (one version per face)
+    selectedStimuli = faces.map((faceIndex) => {
+      const v = assignedVersionForFace(faceIndex);
+      return { faceIndex, version: v, path: imagePath(faceIndex, v) };
+    });
+
+    randomizedStimuli = jsPsych.randomization.shuffle(selectedStimuli);
+
+    // 3) Save assignment metadata
+    await database.ref(`participants/${participantID}/meta/cond_group`).set({
+      participantID,
+      cond_group: condGroup,
+      timestamp: Date.now()
+    });
+
+    await database.ref(`participants/${participantID}/meta/version_assignment`).set({
+      participantID,
+      cond_group: condGroup,
+      assignments: selectedStimuli,
+      timestamp: Date.now()
+    });
+
+    // 4) Set preloadStimuli images (exclude example; already preloaded)
+    preloadStimuli.images = randomizedStimuli.map(s => s.path);
+
+    // 5) Build imageTrials (keep same array reference)
+    imageTrials.length = 0;
+    const total = randomizedStimuli.length;
+    randomizedStimuli.forEach((stim, idx) => {
+      imageTrials.push(makeImageTrial(stim, idx + 1, total));
+    });
+  }
+};
 
 /* ---------- CloudResearch ID entry page (required) ---------- */
 const cloudIdTrial = {
@@ -638,7 +709,7 @@ const cloudIdTrial = {
 const endScreen = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
-    <h2>Thank you for participating!</h2>
+    <h2>Thank you for participating, your completion code is <b>BBFA9EB611</b>.</h2>
     <p>Your responses have been recorded.</p>
     <p>You may now close this window.</p>
   `,
@@ -648,7 +719,10 @@ const endScreen = {
 
 /* ---------- Timeline with consent branching ---------- */
 const timeline = [];
-timeline.push(preload);
+
+// preload only the example image immediately
+timeline.push(preloadExample);
+
 timeline.push(consent);
 
 timeline.push({
@@ -661,11 +735,20 @@ timeline.push({
 
 timeline.push({
   timeline: [
+    // assign condGroup, build stimuli, set up preloadStimuli + imageTrials
+    setupCounterbalance,
+
+    // preload participant-specific stimuli after we know them
+    preloadStimuli,
+
     demographics,
     instructions,
     exampleTrial,
     startReal,
-    ...imageTrials,
+
+    // run the dynamically-built trials
+    { timeline: imageTrials },
+
     cloudIdTrial,
     endScreen
   ],
