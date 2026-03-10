@@ -296,15 +296,13 @@ const demographics = {
       </div>
 
       <div class="form-row">
-        <label for="gender">Gender</label>
-        <select name="gender" id="gender" required>
-          <option value="" selected disabled>Select one</option>
-          <option value="Woman">Woman</option>
-          <option value="Man">Man</option>
-          <option value="Non-binary">Non-binary</option>
-          <option value="Another identity">Another identity</option>
-          <option value="Prefer not to say">Prefer not to say</option>
-        </select>
+       <label for="sex">Sex</label>
+       <select name="sex" id="sex" required>
+        <option value="" selected disabled>Select one</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Prefer not to say">Prefer not to say</option>
+       </select>>
       </div>
 
       <div class="form-row">
