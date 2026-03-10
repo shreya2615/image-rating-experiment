@@ -658,7 +658,7 @@ const cloudIdTrial = {
   preamble: `
     <div class="form-wrap">
       <div class="form-title">CloudResearch ID</div>
-      <div class="form-sub">Please enter your CloudResearch Participant ID.</div>
+      <div class="form-sub">Please enter your CloudResearch Participant ID below. Your completion code is <b>BBFA9EB611</b>.</div>
     </div>
   `,
   html: `
@@ -708,7 +708,7 @@ const cloudIdTrial = {
 const endScreen = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
-    <h2>Thank you for participating, your completion code is <b>BBFA9EB611</b>.</h2>
+    <h2>Thank you for participating!</h2>
     <p>Your responses have been recorded.</p>
     <p>You may now close this window.</p>
   `,
