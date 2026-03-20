@@ -406,7 +406,7 @@ const instructions = {
     <p><b>Welcome to the study.</b></p>
     <p>You will see a total of <b>10 images</b>.</p>
     <p>For each image, you will answer <b>4 questions</b> using a likert scale.</p>
-    <p>Please view the image and answer the associated questions below it.</p>
+    <p>Please view the image and answer the associated questions below it to the best of your ability.</p>
     <p style="margin-top: 30px;">Press SPACE to see an example.</p>
   `,
   choices: [" "]
