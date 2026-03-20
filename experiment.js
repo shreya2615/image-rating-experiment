@@ -657,7 +657,7 @@ const cloudIdTrial = {
   preamble: `
     <div class="form-wrap">
       <div class="form-title">CloudResearch ID</div>
-      <div class="form-sub">Please enter your CloudResearch Participant ID below. Your completion code is <b>BBFA9EB611</b>.</div>
+      <div class="form-sub">Please enter your CloudResearch Participant ID below. Your completion code is <b>78E04CA9CC</b>.</div>
     </div>
   `,
   html: `
